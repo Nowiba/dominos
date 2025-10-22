@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Mobile Dominoes</title>
+    <style>
+        /* ========================================================== */
+        /* CSS STYLING (MOBILE-FIRST & DETAILED) */
+        /* ========================================================== */
+        :root {
+            --primary-color: #2e7d32; /* Dark Green */
+            --secondary-color: #ffb300; /* Amber/Orange */
+            --background-color: #e8f5e9;
+            --board-color: #388e3c; /* Deeper Green */
+            --tile-color: #fff8e1; /* Off-White/Cream */
+            --dot-color: #333;
+            --tile-width: 65px;
+            --tile-height: 35px;
+            --dot-size: 5px;
+            --font-stack: 'Arial', sans-serif;
+        }
+
+        /* --- Global & Layout --- */
+        body {
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background-color: var(--background-color);
+            color: #333;
+            touch-action: manipulation;
+            overflow-x: hidden;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 768px;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- Header & Title --- */
+        header {
+            text-align: center;
+            padding: 10px 0;
+            border-bottom: 3px solid var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            color: var(--primary-color);
+            margin: 0;
+        }
+
+        /* --- Scoreboard & Info --- */
+        #score-board {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            background-color: #f0f4c3;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 0.8em;
+            color: #777;
+        }
+
+        .score-value {
+            font-size: 1.2em;
+            color: var(--primary-color);
+        }
+        
+        #current-round-status {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        
+        /* --- Message Box --- */
+        #message {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: var(--secondary-color);
+            color: #333;
+            border-radius: 5px;
+            font-weight: bold;
+            min-height: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- Board Area --- */
+        #board-wrapper {
+            overflow-x: scroll; /* Horizontal scrolling for board */
+            width: 100%;
+            padding: 8px 0;
+            background-color: var(--board-color);
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        #board {
+            display: inline-flex; /* Use inline-flex for horizontal stretch */
+            align-items: center;
+            min-height: calc(var(--tile-width) + 20px);
+            padding: 0 10px;
+        }
+
+        #board p {
+            margin: auto;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+        }
+        
+        /* --- Hands & Actions --- */
+        .hand {
+            padding: 10px 0;
+            border-top: 1px solid var(--primary-color);
+            text-align: center;
+        }
+
+        .hand h3 {
+            font-size: 1.1em;
+            color: var(--primary-color);
+            margin: 5px 0;
+        }
+
+        .hand-tiles {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            min-height: 50px;
+            padding: 5px 0;
+        }
+
+        #actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 5px;
+            padding: 10px 0;
+        }
+
+        button {
+            padding: 10px 5px;
+            font-size: 0.9em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            background-color: var(--primary-color);
+            color: white;
+            flex-grow: 1;
+            box-shadow: 0 3px 0 #1b5e20; /* 3D effect */
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(3px);
+            box-shadow: none;
+        }
+
+        button:disabled {
+            background-color: #b0bec5;
+            box-shadow: 0 3px 0 #78909c;
+            cursor: not-allowed;
+        }
+
+        #start-button {
+            background-color: #03a9f4;
+            box-shadow: 0 3px 0 #0288d1;
+        }
+        
+        /* --- Tile Styling --- */
+        .domino-tile {
+            width: var(--tile-width);
+            height: var(--tile-height);
+            border: 2px solid var(--dot-color);
+            background-color: var(--tile-color);
+            display: flex;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            margin: 3px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            user-select: none;
+            position: relative;
+        }
+
+        /* Vertical orientation for doubles */
+        .domino-tile.vertical {
+            width: var(--tile-height);
+            height: var(--tile-width);
+            flex-direction: column;
+        }
+        
+        .domino-tile.vertical .domino-half:first-child {
+            border-bottom: 2px solid var(--dot-color);
+            border-right: none;
+        }
+
+        .domino-half {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .domino-half:first-child {
+            border-right: 2px solid var(--dot-color);
+        }
+
+        /* Dot Styling */
+        .dot {
+            position: absolute;
+            background-color: var(--dot-color);
+            width: var(--dot-size);
+            height: var(--dot-size);
+            border-radius: 50%;
+        }
+
+        /* Dot Positioning (Detailed) */
+        .pips-1 .dot:nth-child(1) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        .pips-2 .dot:nth-child(1) { top: 15%; left: 15%; }
+        .pips-2 .dot:nth-child(2) { bottom: 15%; right: 15%; }
+
+        .pips-3 .dot:nth-child(1) { top: 15%; left: 15%; }
+        .pips-3 .dot:nth-child(2) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .pips-3 .dot:nth-child(3) { bottom: 15%; right: 15%; }
+
+        .pips-4 .dot:nth-child(1) { top: 15%; left: 15%; }
+        .pips-4 .dot:nth-child(2) { top: 15%; right: 15%; }
+        .pips-4 .dot:nth-child(3) { bottom: 15%; left: 15%; }
+        .pips-4 .dot:nth-child(4) { bottom: 15%; right: 15%; }
+
+        .pips-5 .dot:nth-child(1) { top: 15%; left: 15%; }
+        .pips-5 .dot:nth-child(2) { top: 15%; right: 15%; }
+        .pips-5 .dot:nth-child(3) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .pips-5 .dot:nth-child(4) { bottom: 15%; left: 15%; }
+        .pips-5 .dot:nth-child(5) { bottom: 15%; right: 15%; }
+
+        .pips-6 .dot:nth-child(1) { top: 15%; left: 15%; }
+        .pips-6 .dot:nth-child(2) { top: 15%; right: 15%; }
+        .pips-6 .dot:nth-child(3) { top: 50%; left: 15%; transform: translateY(-50%); }
+        .pips-6 .dot:nth-child(4) { top: 50%; right: 15%; transform: translateY(-50%); }
+        .pips-6 .dot:nth-child(5) { bottom: 15%; left: 15%; }
+        .pips-6 .dot:nth-child(6) { bottom: 15%; right: 15%; }
+        
+        /* --- Interaction Effects --- */
+        .tile-in-hand {
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .tile-in-hand.selected {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 0 8px 15px rgba(255, 179, 0, 0.7);
+            border: 2px solid var(--secondary-color);
+        }
+
+        /* AI Hand (Hidden) */
+        #player-2-hand .domino-tile {
+            background-color: #616161; /* Dark Gray back */
+            border-color: #424242;
+            box-shadow: none;
+        }
+        #player-2-hand .dot {
+            visibility: hidden;
+        }
+
+        /* Board End Markers */
+        .board-end-marker {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f44336; /* Red for placement */
+            color: white;
+            border-radius: 50%;
+            font-size: 1em;
+            margin: 0 10px;
+            cursor: pointer;
+            flex-shrink: 0;
+            opacity: 0.8;
+            border: 2px solid #fff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .board-end-marker:hover:not(.hidden) {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .board-end-marker.hidden {
+            display: none;
+        }
+        /* ========================================================== */
+        /* END CSS STYLING */
+        /* ========================================================== */
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <header>
+            <h1>Ultimate Mobile Dominoes 🎲</h1>
+        </header>
+
+        <div id="score-board">
+            <div class="score-item">
+                <span class="score-label">Player 1 (You) Score:</span>
+                <span id="p1-game-score" class="score-value">0</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">AI Score:</span>
+                <span id="p2-game-score" class="score-value">0</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">Target Score:</span>
+                <span class="score-value">100</span>
+            </div>
+        </div>
+        
+        <div id="current-round-status">
+            <span id="current-player-display">Waiting to start...</span> |
+            <span id="boneyard-count-display">Boneyard: 28</span>
+        </div>
+
+        <div id="message">Click **Start New Round** to begin a game!</div>
+
+        <div id="board-wrapper">
+            <div id="board">
+                <p>The game board will load here. Scroll horizontally if the line gets long.</p>
+            </div>
+        </div>
+        
+        <div id="hands-container">
+            <div id="player-2-hand" class="hand">
+                <h3>AI Opponent - <span id="p2-tile-count">0</span> tiles</h3>
+                <div class="hand-tiles">
+                    </div>
+            </div>
+            
+            <div id="player-1-hand" class="hand">
+                <h3>Your Hand (Player 1) - <span id="p1-tile-count">0</span> tiles</h3>
+                <div class="hand-tiles">
+                    </div>
+            </div>
+        </div>
+
+        <div id="actions">
+            <button id="start-button" onclick="startGame()">Start New Round</button>
+            <button id="draw-button" onclick="handleDraw()" disabled>Draw Tile</button>
+            <button id="pass-button" onclick="handlePass()" disabled>Pass</button>
+        </div>
+        
+    </div>
+
+    <audio id="sfx-play" src="https://freesound.org/data/previews/256/256673_4734731-lq.mp3" preload="auto"></audio>
+    <audio id="sfx-draw" src="https://freesound.org/data/previews/337/337059_4576313-lq.mp3" preload="auto"></audio>
+    <audio id="sfx-win" src="https://freesound.org/data/previews/273/273461_5127201-lq.mp3" preload="auto"></audio>
+    <audio id="sfx-block" src="https://freesound.org/data/previews/415/415510_4193557-lq.mp3" preload="auto"></audio>
+
+
+    <script>
+        /* ========================================================== */
+        /* JAVASCRIPT GAME LOGIC (ADVANCED) */
+        /* ========================================================== */
+
+        const GAME_TARGET_SCORE = 100;
+        const NUM_PLAYERS = 2;
+        const STARTING_TILES = 7;
+        const MAX_PIP = 6;
+        const AI_THINK_TIME = 1500; // AI delay in ms
+
+        let deck = [];
+        let hands = [[], []]; // hands[0] = P1, hands[1] = P2 (AI)
+        let board = [];
+        let playerScores = [0, 0]; // Game scores (first to 100)
+        let currentPlayer = 0;
+        let selectedTile = null;
+        let consecutivePasses = 0;
+        let roundActive = false;
+
+        // --- DOM Elements ---
+        const boardEl = document.getElementById('board');
+        const p1HandEl = document.querySelector('#player-1-hand .hand-tiles');
+        const p2HandEl = document.querySelector('#player-2-hand .hand-tiles');
+        const currentPlayerDisplayEl = document.getElementById('current-player-display');
+        const boneyardCountDisplayEl = document.getElementById('boneyard-count-display');
+        const messageEl = document.getElementById('message');
+        const drawButton = document.getElementById('draw-button');
+        const passButton = document.getElementById('pass-button');
+        const startButton = document.getElementById('start-button');
+        const p1TileCountEl = document.getElementById('p1-tile-count');
+        const p2TileCountEl = document.getElementById('p2-tile-count');
+        const p1GameScoreEl = document.getElementById('p1-game-score');
+        const p2GameScoreEl = document.getElementById('p2-game-score');
+        
+        // --- Audio Elements ---
+        const sfxPlay = document.getElementById('sfx-play');
+        const sfxDraw = document.getElementById('sfx-draw');
+        const sfxWin = document.getElementById('sfx-win');
+        const sfxBlock = document.getElementById('sfx-block');
+
+        // --- Utility Functions ---
+
+        /** Play sound effect, resetting if it's currently playing */
+        function playSFX(audioElement) {
+            if (!audioElement) return;
+            audioElement.pause();
+            audioElement.currentTime = 0;
+            audioElement.volume = 0.5;
+            audioElement.play().catch(e => console.log('Audio play failed:', e));
+        }
+
+        /** Creates the full set of 28 dominoes (0-0 to 6-6) */
+        function createDeck() {
+            deck = [];
+            for (let i = 0; i <= MAX_PIP; i++) {
+                for (let j = i; j <= MAX_PIP; j++) {
+                    deck.push({ pips: [i, j], id: `${i}-${j}`, value: i + j });
+                }
+            }
+        }
+
+        /** Shuffles the deck (Fisher-Yates) */
+        function shuffleDeck() {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        /** Deals starting tiles and determines starting player */
+        function dealTiles() {
+            hands = [[], []];
+            let highestDouble = null;
+            let starter = -1;
+
+            for (let i = 0; i < NUM_PLAYERS; i++) {
+                for (let j = 0; j < STARTING_TILES; j++) {
+                    hands[i].push(deck.pop());
+                }
+                
+                // Find highest double to determine start
+                hands[i].forEach(tile => {
+                    if (tile.pips[0] === tile.pips[1]) {
+                        if (!highestDouble || tile.pips[0] > highestDouble.pips[0]) {
+                            highestDouble = tile;
+                            starter = i;
+                        }
+                    }
+                });
+                
+                // Sort hand for player readability (doubles first, then value)
+                hands[i].sort((a, b) => {
+                    const aDouble = a.pips[0] === a.pips[1];
+                    const bDouble = b.pips[0] === b.pips[1];
+                    if (aDouble && !bDouble) return -1;
+                    if (!aDouble && bDouble) return 1;
+                    return b.value - a.value;
+                });
+            }
+            
+            // If no double, the highest single tile starts
+            if (starter === -1) {
+                let highestTile = null;
+                hands.forEach((hand, index) => {
+                    hand.forEach(tile => {
+                        if (!highestTile || tile.value > highestTile.value) {
+                            highestTile = tile;
+                            starter = index;
+                        }
+                    });
+                });
+            }
+            
+            return { starter: starter, tile: highestDouble || hands[starter].reduce((a, b) => a.value > b.value ? a : b) };
+        }
+
+        /** Draws one tile from the deck */
+        function drawOneTile(playerIndex) {
+            if (deck.length === 0) return null;
+            const tile = deck.pop();
+            hands[playerIndex].push(tile);
+            playSFX(sfxDraw);
+            return tile;
+        }
+
+        // --- Rendering & UI Updates ---
+
+        /** Renders a single tile element */
+        function createTileElement(tile, isHandTile = true, isHidden = false) {
+            const tileEl = document.createElement('div');
+            tileEl.className = 'domino-tile';
+            tileEl.setAttribute('data-pips', `${tile.pips[0]},${tile.pips[1]}`);
+            
+            if (isHandTile && !isHidden) {
+                tileEl.classList.add('tile-in-hand');
+                tileEl.onclick = () => handleTileSelection(tileEl, tile);
+            }
+
+            if (!isHidden) {
+                tile.pips.forEach(pips => {
+                    const half = document.createElement('div');
+                    half.className = `domino-half pips-${pips}`;
+                    for (let i = 0; i < pips; i++) {
+                        const dot = document.createElement('span');
+                        dot.className = 'dot';
+                        half.appendChild(dot);
+                    }
+                    tileEl.appendChild(half);
+                });
+            }
+            return tileEl;
+        }
+
+        /** Renders all player hands to the DOM */
+        function renderHands() {
+            p1HandEl.innerHTML = '';
+            hands[0].forEach(tile => {
+                p1HandEl.appendChild(createTileElement(tile, true, false));
+            });
+            p1TileCountEl.textContent = hands[0].length;
+
+            p2HandEl.innerHTML = '';
+            hands[1].forEach(tile => {
+                p2HandEl.appendChild(createTileElement(tile, false, true));
+            });
+            p2TileCountEl.textContent = hands[1].length;
+            
+            // Re-select if necessary
+            if (selectedTile) {
+                const pips = selectedTile.getAttribute('data-pips');
+                const newEl = p1HandEl.querySelector(`[data-pips="${pips}"]`);
+                if (newEl) {
+                    newEl.classList.add('selected');
+                    selectedTile = newEl;
+                } else {
+                    selectedTile = null;
+                }
+            }
+            
+            updateActionButtons();
+        }
+
+        /** Renders the board with placement markers */
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            if (board.length === 0) {
+                boardEl.innerHTML = '<p>The round will start shortly with the first tile.</p>';
+                return;
+            }
+            
+            const leftEnd = board[0].pips[0];
+            const rightEnd = board[board.length - 1].pips[1];
+            
+            // 1. Left Placement Marker
+            const leftEndMarker = document.createElement('div');
+            leftEndMarker.className = 'board-end-marker';
+            leftEndMarker.id = 'left-marker';
+            leftEndMarker.textContent = leftEnd;
+            leftEndMarker.onclick = () => handleBoardPlacement('left');
+            leftEndMarker.classList.add('hidden');
+            boardEl.appendChild(leftEndMarker);
+
+            // 2. Tiles on Board
+            board.forEach(tile => {
+                const tileEl = createTileElement(tile, false, false);
+                if (tile.pips[0] === tile.pips[1]) {
+                    tileEl.classList.add('vertical');
+                }
+                boardEl.appendChild(tileEl);
+            });
+
+            // 3. Right Placement Marker
+            const rightEndMarker = document.createElement('div');
+            rightEndMarker.className = 'board-end-marker';
+            rightEndMarker.id = 'right-marker';
+            rightEndMarker.textContent = rightEnd;
+            rightEndMarker.onclick = () => handleBoardPlacement('right');
+            rightEndMarker.classList.add('hidden');
+            boardEl.appendChild(rightEndMarker);
+            
+            // Scroll to the latest tile
+            boardEl.scrollLeft = boardEl.scrollWidth;
+        }
+        
+        function setMessage(text, type = 'status') {
+            messageEl.textContent = text;
+            // Simplified coloring for message type
+            messageEl.style.backgroundColor = type === 'error' ? '#ef9a9a' : (type === 'info' ? '#c8e6c9' : var(--secondary-color));
+            messageEl.style.color = type === 'error' ? '#b71c1c' : '#333';
+        }
+        
+        function updateDisplay() {
+            boneyardCountDisplayEl.textContent = `Boneyard: ${deck.length}`;
+            currentPlayerDisplayEl.textContent = `Current Turn: Player ${currentPlayer + 1} (${currentPlayer === 0 ? 'You' : 'AI'})`;
+            p1GameScoreEl.textContent = playerScores[0];
+            p2GameScoreEl.textContent = playerScores[1];
+        }
+
+        // --- Game Mechanics ---
+
+        /** Checks if there are any playable tiles in the current player's hand */
+        function getPlayableMoves(playerHand) {
+            if (board.length === 0) {
+                // If board is empty, any tile can be played (return the whole hand)
+                return playerHand.map(tile => ({ tile, end: 'right', requiredPip: -1 }));
+            }
+            
+            const leftEnd = board[0].pips[0];
+            const rightEnd = board[board.length - 1].pips[1];
+            let moves = [];
+            
+            playerHand.forEach(tile => {
+                if (tile.pips.includes(rightEnd)) {
+                    moves.push({ tile, end: 'right', requiredPip: rightEnd });
+                }
+                if (tile.pips.includes(leftEnd)) {
+                    // Avoid duplicating if a double can be played on both ends
+                    if (tile.pips[0] === tile.pips[1] && rightEnd === leftEnd && tile.pips[0] === rightEnd) {
+                        return;
+                    }
+                    moves.push({ tile, end: 'left', requiredPip: leftEnd });
+                }
+            });
+            return moves;
+        }
+
+        /** Core logic for placing a tile on the board */
+        function playTile(playerIndex, tile, end) {
+            let placed = false;
+            let tileIndex = -1;
+
+            if (board.length === 0) {
+                // Initial move
+                board.push(tile);
+                placed = true;
+            } else {
+                const requiredPip = (end === 'left') ? board[0].pips[0] : board[board.length - 1].pips[1];
+                let playPip = -1;
+                let otherPip = -1;
+                
+                // Determine which pip matches the required end
+                if (tile.pips[0] === requiredPip) {
+                    playPip = tile.pips[0];
+                    otherPip = tile.pips[1];
+                } else if (tile.pips[1] === requiredPip) {
+                    playPip = tile.pips[1];
+                    otherPip = tile.pips[0];
+                }
+
+                if (playPip !== -1) {
+                    // Check if tile needs to be flipped for placement
+                    if (end === 'left') {
+                        // The non-matching end becomes the new left end
+                        board.unshift({ pips: [otherPip, playPip], id: tile.id, value: tile.value });
+                    } else { // 'right'
+                        // The non-matching end becomes the new right end
+                        board.push({ pips: [playPip, otherPip], id: tile.id, value: tile.value });
+                    }
+                    placed = true;
+                }
+            }
+            
+            if (placed) {
+                playSFX(sfxPlay);
+                // Find and remove tile from hand (handles potential [b,a] in hand vs [a,b] in played tile)
+                tileIndex = hands[playerIndex].findIndex(t => 
+                    (t.pips[0] === tile.pips[0] && t.pips[1] === tile.pips[1]) ||
+                    (t.pips[0] === tile.pips[1] && t.pips[1] === tile.pips[0])
+                );
+                
+                if (tileIndex !== -1) {
+                    hands[playerIndex].splice(tileIndex, 1);
+                }
+                
+                consecutivePasses = 0;
+                renderHands();
+                renderBoard();
+                
+                // Check for BINGO (ends add up to a multiple of 5) - not fully implemented for brevity but this is the hook
+                // const currentEnds = board.length > 1 ? board[0].pips[0] + board[board.length-1].pips[1] : 0;
+                
+                return true;
+            }
+            return false;
+        }
+
+        /** Handles human player drawing a tile */
+        function handleDraw() {
+            if (currentPlayer !== 0 || !roundActive) return;
+            if (deck.length === 0) {
+                setMessage("The boneyard is empty! You must pass.", 'error');
+                return;
+            }
+            
+            const drawnTile = drawOneTile(0);
+            renderHands();
+            updateDisplay();
+
+            if (getPlayableMoves(hands[0]).some(m => m.tile === drawnTile)) {
+                setMessage(`You drew ${drawnTile.pips[0]}-${drawnTile.pips[1]}. You can now play it!`, 'info');
+                // P1 gets another chance to play immediately
+            } else {
+                setMessage(`You drew a tile and still can't play. Passing turn...`, 'info');
+                setTimeout(nextTurn, 500);
+            }
+        }
+        
+        /** Handles human player passing the turn */
+        function handlePass() {
+            if (currentPlayer !== 0 || !roundActive) return;
+            if (getPlayableMoves(hands[0]).length > 0) {
+                setMessage("You have a playable tile! You must play or draw if the boneyard isn't empty.", 'error');
+                return;
+            }
+            
+            consecutivePasses++;
+            setMessage(`Player 1 (You) passes.`, 'info');
+            
+            if (consecutivePasses >= NUM_PLAYERS) {
+                endRound('Block');
+                return;
+            }
+            
+            nextTurn();
+        }
+
+        /** Switches turn and handles AI opponent move */
+        function nextTurn() {
+            if (!roundActive) return;
+            
+            currentPlayer = (currentPlayer + 1) % NUM_PLAYERS;
+            updateDisplay();
+            updateActionButtons();
+            
+            if (currentPlayer === 1) {
+                // AI Turn
+                setTimeout(aiMove, AI_THINK_TIME);
+            } else {
+                // Human Turn - Clear selection
+                selectedTile = null;
+                document.getElementById('left-marker').classList.add('hidden');
+                document.getElementById('right-marker').classList.add('hidden');
+            }
+        }
+        
+        /** Advanced AI Logic (Player 2) */
+        function aiMove() {
+            const aiHand = hands[1];
+            let playableMoves = getPlayableMoves(aiHand);
+            
+            if (playableMoves.length > 0) {
+                // AI Strategy:
+                // 1. Prioritize playing a double (empties hand faster).
+                // 2. Play the highest value tile that is NOT a double (to clear high-scoring tiles).
+                // 3. Play a tile that leaves an end the AI has many of (to secure future moves). (Simplified to just prioritize high value)
+                
+                playableMoves.sort((a, b) => {
+                    const aIsDouble = a.tile.pips[0] === a.tile.pips[1];
+                    const bIsDouble = b.tile.pips[0] === b.tile.pips[1];
+                    
+                    if (aIsDouble && !bIsDouble) return -1;
+                    if (!aIsDouble && bIsDouble) return 1;
+                    
+                    return b.tile.value - a.tile.value; // Play highest value first
+                });
+                
+                const bestMove = playableMoves[0];
+                
+                playTile(1, bestMove.tile, bestMove.end);
+                setMessage(`Player 2 (AI) plays ${bestMove.tile.pips[0]}-${bestMove.tile.pips[1]}.`, 'info');
+                
+                if (hands[1].length === 0) {
+                    endRound(1);
+                } else {
+                    nextTurn();
+                }
+                
+            } else if (deck.length > 0) {
+                // Draw tile
+                const drawnTile = drawOneTile(1);
+                renderHands();
+                updateDisplay();
+                setMessage(`Player 2 (AI) draws a tile.`, 'info');
+                
+                // Try to move again after drawing
+                setTimeout(aiMove, 500); 
+                
+            } else {
+                // Pass
+                consecutivePasses++;
+                setMessage("Player 2 (AI) passes.", 'info');
+                
+                if (consecutivePasses >= NUM_PLAYERS) {
+                    endRound('Block');
+                    return;
+                }
+                nextTurn();
+            }
+        }
+        
+        /** Enables/disables action buttons based on current state */
+        function updateActionButtons() {
+            const isHumanTurn = currentPlayer === 0;
+            const playableMoves = getPlayableMoves(hands[0]).length > 0;
+            const canDraw = deck.length > 0;
+            
+            drawButton.disabled = !isHumanTurn || playableMoves || !canDraw;
+            passButton.disabled = !isHumanTurn || playableMoves || canDraw;
+
+            // Hide markers
+            document.getElementById('left-marker').classList.add('hidden');
+            document.getElementById('right-marker').classList.add('hidden');
+        }
+        
+        // --- Round and Game Management ---
+        
+        /** Starts a new round */
+        function startGame() {
+            roundActive = true;
+            createDeck();
+            shuffleDeck();
+            board = [];
+            selectedTile = null;
+            consecutivePasses = 0;
+            
+            const startInfo = dealTiles();
+            currentPlayer = startInfo.starter;
+            
+            // Starter plays their highest tile/double
+            playTile(currentPlayer, startInfo.tile, 'right');
+            setMessage(`Round started! Player ${currentPlayer + 1} plays first with ${startInfo.tile.pips[0]}-${startInfo.tile.pips[1]}.`, 'info');
+            
+            startButton.disabled = true;
+            
+            // Immediate next turn after the starting move
+            nextTurn();
+        }
+
+        /** Ends the current round and calculates scores */
+        function endRound(reason) {
+            roundActive = false;
+            startButton.disabled = false;
+            drawButton.disabled = true;
+            passButton.disabled = true;
+            
+            let winnerIndex = -1;
+            let loserIndex = -1;
+            let roundScore = 0;
+            let messageText = '';
+
+            if (reason === 0 || reason === 1) {
+                // Win by playing all tiles
+                winnerIndex = reason;
+                loserIndex = (winnerIndex + 1) % NUM_PLAYERS;
+                // Score is sum of pips left in loser's hand
+                roundScore = hands[loserIndex].reduce((sum, tile) => sum + tile.value, 0);
+                
+                messageText = `🏆 Round Winner: Player ${winnerIndex + 1}! (${roundScore} points)`;
+                playSFX(sfxWin);
+                
+            } else if (reason === 'Block') {
+                // Win by score count after a block
+                const p1Pips = hands[0].reduce((sum, tile) => sum + tile.value, 0);
+                const p2Pips = hands[1].reduce((sum, tile) => sum + tile.value, 0);
+                
+                if (p1Pips < p2Pips) {
+                    winnerIndex = 0;
+                    roundScore = p2Pips;
+                } else if (p2Pips < p1Pips) {
+                    winnerIndex = 1;
+                    roundScore = p1Pips;
+                } else {
+                    messageText = `⚔️ BLOCK! Tie score. No points awarded this round.`;
+                    playSFX(sfxBlock);
+                }
+                
+                if (winnerIndex !== -1) {
+                    messageText = `🔒 BLOCK! Player ${winnerIndex + 1} wins the block with a low score. (${roundScore} points)`;
+                }
+                playSFX(sfxBlock);
+            }
+            
+            if (winnerIndex !== -1) {
+                playerScores[winnerIndex] += roundScore;
+                
+                if (playerScores[winnerIndex] >= GAME_TARGET_SCORE) {
+                    endGame(winnerIndex);
+                    return;
+                }
+            }
+            
+            setMessage(messageText + " Click **Start New Round** to continue the game.", 'error');
+            updateDisplay();
+        }
+        
+        /** Ends the entire game */
+        function endGame(winnerIndex) {
+            const winnerName = winnerIndex === 0 ? "Player 1 (You)" : "AI Opponent";
+            setMessage(`👑 GAME CHAMPION: ${winnerName} WINS! Final Score: ${playerScores[winnerIndex]}!`, 'error');
+            playSFX(sfxWin);
+            
+            // Reset scores for a new game
+            playerScores = [0, 0];
+            startButton.textContent = "Start New Game";
+        }
+
+        // --- Human Player Interaction ---
+
+        /** Handles the human player selecting a tile in their hand */
+        function handleTileSelection(tileEl, tile) {
+            if (currentPlayer !== 0 || !roundActive) return;
+            
+            // Clear previous selection and highlight
+            if (selectedTile) {
+                selectedTile.classList.remove('selected');
+            }
+            document.getElementById('left-marker').classList.add('hidden');
+            document.getElementById('right-marker').classList.add('hidden');
+
+            if (selectedTile === tileEl) {
+                selectedTile = null;
+                setMessage('Tile deselected.', 'status');
+                return;
+            }
+            
+            selectedTile = tileEl;
+            tileEl.classList.add('selected');
+
+            // Show placement markers if the tile is playable
+            const moves = getPlayableMoves([tile]);
+            
+            if (moves.length === 0) {
+                setMessage("This tile is currently not playable.", 'error');
+                return;
+            }
+            
+            setMessage(`Selected tile ${tile.pips[0]}-${tile.pips[1]}. Tap a red marker on the board to place it.`, 'info');
+
+            moves.forEach(move => {
+                if (move.end === 'left') {
+                    document.getElementById('left-marker').classList.remove('hidden');
+                } else if (move.end === 'right') {
+                    document.getElementById('right-marker').classList.remove('hidden');
+                }
+            });
+        }
+        
+        /** Handles the human player placing the selected tile on the board */
+        function handleBoardPlacement(end) {
+            if (currentPlayer !== 0 || !selectedTile || !roundActive) return;
+            
+            const pipsStr = selectedTile.getAttribute('data-pips').split(',');
+            const pips = [parseInt(pipsStr[0]), parseInt(pipsStr[1])];
+            const tileToPlay = { pips: pips, id: pips.join('-'), value: pips[0] + pips[1] };
+            
+            const success = playTile(0, tileToPlay, end);
+            
+            if (success) {
+                selectedTile = null;
+                if (hands[0].length === 0) {
+                    endRound(0); // Player 1 wins round
+                } else {
+                    nextTurn();
+                }
+            } else {
+                 setMessage('Invalid placement! The tile does not match the required end value.', 'error');
+            }
+        }
+
+        // --- Initial Setup ---
+        updateDisplay();
+        
+        /* ========================================================== */
+        /* END JAVASCRIPT LOGIC */
+        /* ========================================================== */
+    </script>
+</body>
+</html>
