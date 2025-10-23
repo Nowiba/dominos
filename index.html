@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Dominoes</title>
+    <style>
+        /* --- 1. Core Design and Aesthetics --- */
+
+        :root {
+            --board-bg: #014421; /* Deep Forest Green */
+            --highlight: #FFBF00; /* Amber/Gold */
+            --text-light: #f0f0f0;
+            --text-dark: #1a1a1a;
+            
+            --tile-bg: #fdfdfd;
+            --tile-pip: #222;
+            
+            --p1-color: #00BFFF; /* Deep Sky Blue (more contrast than Teal) */
+            --p2-color: #FF6347; /* Tomato Red */
+            --p3-color: #9370DB; /* Medium Purple */
+            --p4-color: #32CD32; /* Lime Green */
+
+            --error-red: #FF0000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            /* Disable native touch behaviors like double-tap zoom */
+            touch-action: manipulation;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* No scrolling */
+            background-color: var(--board-bg);
+            color: var(--text-light);
+            position: relative;
+        }
+
+        /* --- Main Game Layout (Mobile-First) --- */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh; /* Full viewport height */
+            width: 100vw;
+        }
+
+        /* --- 1. Sidebar Placement --- */
+        #info-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 44px; /* Good touch target size */
+            height: 44px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--highlight);
+            border: 2px solid var(--highlight);
+            border-radius: 50%;
+            font-size: 24px;
+            font-weight: bold;
+            line-height: 40px; /* Aligns text vertically */
+            text-align: center;
+            cursor: pointer;
+            z-index: 1002;
+            transition: transform 0.2s ease, background-color 0.2s;
+        }
+        #info-toggle:active {
+            transform: scale(1.1);
+            background-color: rgba(255, 191, 0, 0.2);
+        }
+
+        #info-sidebar {
+            position: absolute;
+            top: 0;
+            right: -300px; /* Off-screen */
+            width: 300px;
+            max-width: 80%;
+            height: 100%;
+            background-color: #333;
+            border-left: 2px solid var(--highlight);
+            z-index: 1001;
+            padding: 80px 20px 20px 20px;
+            transition: right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        #info-sidebar.show {
+            right: 0;
+        }
+        #info-sidebar h2 {
+            color: var(--highlight);
+            border-bottom: 1px solid var(--highlight);
+            padding-bottom: 10px;
+        }
+
+        /* --- 1. Board Size & 3. Guidance Removal --- */
+        #message {
+            flex-shrink: 0;
+            padding: 10px;
+            font-size: 1.2rem;
+            font-weight: 500;
+            text-align: center;
+            height: 60px; /* Fixed height for stability */
+            line-height: 40px;
+            background-color: rgba(0, 0, 0, 0.2);
+            /* NO other instructions */
+        }
+
+        /* --- 1. Board Wrapper --- */
+        #board-wrapper {
+            flex-grow: 1; /* Takes up all remaining space */
+            width: 100%;
+            position: relative;
+            overflow: hidden; /* Hide dominoes that go off-screen */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        
+        /* The actual chain of dominoes */
+        #board-chain {
+            display: flex;
+            align-items: center;
+            position: absolute;
+            /* JS will set left/top */
+        }
+
+        /* --- Player Hands --- */
+        .hand {
+            flex-shrink: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.3);
+            overflow-x: auto; /* Scrollable hand */
+            overflow-y: hidden;
+            white-space: nowrap;
+            padding: 10px;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+
+        #player-hand {
+            height: 120px; /* Fixed height for player's hand */
+            border-top: 2px solid var(--highlight);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Opponent hands (simplified) */
+        .opponent-hand {
+            position: absolute;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+        #opponent-hand-1 { /* Top */
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        #opponent-hand-2 { /* Left */
+            top: 50%;
+            left: 10px;
+            flex-direction: column;
+            transform: translateY(-50%);
+        }
+        #opponent-hand-3 { /* Right */
+            top: 50%;
+            right: 10px;
+            flex-direction: column;
+            transform: translateY(-50%);
+        }
+
+        /* --- Domino Tile Styling --- */
+        .tile {
+            width: 44px;
+            height: 88px;
+            background-color: var(--tile-bg);
+            border: 1px solid #888;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            padding: 4px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            flex-shrink: 0; /* Prevents shrinking in flex container */
+        }
+        
+        .tile-back {
+            width: 20px;
+            height: 40px;
+            background-color: var(--tile-bg);
+            border: 1px solid #888;
+            border-radius: 3px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        #opponent-hand-2 .tile-back,
+        #opponent-hand-3 .tile-back {
+             width: 40px;
+             height: 20px;
+        }
+
+        .tile-half {
+            width: 100%;
+            height: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--tile-pip);
+        }
+        .tile-divider {
+            height: 2px;
+            background-color: #888;
+            margin: 2px 0;
+        }
+
+        /* --- 2. Gameplay and Touch-Based UX --- */
+        #player-hand .tile {
+            height: 100px;
+            width: 50px;
+        }
+        
+        /* 'Selected' state */
+        .selected-tile {
+            transform: scale(1.1) translateY(-10px);
+            z-index: 100;
+        }
+        
+        /* Player-specific highlights */
+        .selected-p1 { box-shadow: 0 0 15px 5px var(--p1-color); }
+        .selected-p2 { box-shadow: 0 0 15px 5px var(--p2-color); }
+        .selected-p3 { box-shadow: 0 0 15px 5px var(--p3-color); }
+        .selected-p4 { box-shadow: 0 0 15px 5px var(--p4-color); }
+
+        /* --- 3. Error Visual Feedback --- */
+        .tile-error {
+            animation: flash-red 0.5s ease;
+        }
+
+        @keyframes flash-red {
+            0%, 100% {
+                background-color: var(--tile-bg);
+                box-shadow: 0 0 15px 5px var(--p1-color); /* Maintain selection shadow */
+            }
+            50% {
+                background-color: var(--error-red);
+                box-shadow: 0 0 20px 10px var(--error-red);
+            }
+        }
+        /* Specific error for P2 */
+        .selected-p2.tile-error { animation: flash-red-p2 0.5s ease; }
+        @keyframes flash-red-p2 {
+            0%, 100% { background-color: var(--tile-bg); box-shadow: 0 0 15px 5px var(--p2-color); }
+            50% { background-color: var(--error-red); box-shadow: 0 0 20px 10px var(--error-red); }
+        }
+        /* (Add P3, P4 as needed) */
+
+
+        /* --- 4. Game Start and Turn Sequence --- */
+        #countdown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20vw;
+            font-weight: bold;
+            color: var(--highlight);
+            text-shadow: 0 0 20px var(--highlight);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+        }
+        #countdown-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        #countdown-text {
+            animation: pulse-scale 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-scale {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.8;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="message">Loading game...</div>
+        
+        <div id="opponent-hand-1" class="opponent-hand"></div>
+        <div id="opponent-hand-2" class="opponent-hand"></div>
+        <div id="opponent-hand-3" class="opponent-hand"></div>
+
+        <div id="board-wrapper">
+            <div id="board-chain">
+                </div>
+        </div>
+
+        <div id="player-hand" class="hand">
+            </div>
+    </div>
+
+    <div id="info-toggle">ℹ</div>
+
+    <div id="info-sidebar">
+        <h2>Game Info</h2>
+        <p>Player Scores:</p>
+        <ul>
+            <li>Player 1: 0</li>
+            <li>Player 2: 0</li>
+            <li>Player 3: 0</li>
+            <li>Player 4: 0</li>
+        </ul>
+        <br>
+        <p>This panel shows game state, scores, and settings. No "how-to" guides.</p>
+    </div>
+
+    <div id="countdown-overlay">
+        <div id="countdown-text">3</div>
+    </div>
+    
+    <audio id="sound-countdown" src="https://actions.google.com/sounds/v1/timers/countdown_timer.ogg" preload="auto"></audio>
+    <audio id="sound-go" src="https://actions.google.com/sounds/v1/sports/goal_horn.ogg" preload="auto"></audio>
+    <audio id="sound-place" src="https://actions.google.com/sounds/v1/impacts/wood_thud.ogg" preload="auto"></audio>
+    <audio id="sound-error" src="https://actions.google.com/sounds/v1/alerts/card_decline.ogg" preload="auto"></audio>
+    <audio id="sound-select" src="https://actions.google.com/sounds/v1/ui/button_press.ogg" preload="auto"></audio>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- DOM Elements ---
+            const boardWrapper = document.getElementById('board-wrapper');
+            const boardChain = document.getElementById('board-chain');
+            const playerHandEl = document.getElementById('player-hand');
+            const messageEl = document.getElementById('message');
+            const infoToggle = document.getElementById('info-toggle');
+            const infoSidebar = document.getElementById('info-sidebar');
+            const countdownOverlay = document.getElementById('countdown-overlay');
+            const countdownText = document.getElementById('countdown-text');
+            
+            // --- Sound Elements ---
+            const sounds = {
+                countdown: document.getElementById('sound-countdown'),
+                go: document.getElementById('sound-go'),
+                place: document.getElementById('sound-place'),
+                error: document.getElementById('sound-error'),
+                select: document.getElementById('sound-select')
+            };
+
+            // --- Game State ---
+            const game = {
+                players: [], // { id: 1, hand: [[6,6], [6,5]], isBot: false, color: 'p1-color' }
+                board: [], // [[6,6], [6,5]]
+                currentPlayerIndex: 0,
+                selectedTile: null, // { element: tileEl, values: [6,6], inHand: true }
+                ends: { left: null, right: null },
+                playerColors: ['p1', 'p2', 'p3', 'p4'],
+                playerHighlightColors: ['var(--p1-color)', 'var(--p2-color)', 'var(--p3-color)', 'var(--p4-color)']
+            };
+
+            // --- Event Listeners ---
+            infoToggle.addEventListener('click', toggleSidebar);
+            playerHandEl.addEventListener('click', handleHandClick);
+            boardWrapper.addEventListener('click', handleBoardClick);
+
+            
+            function initGame() {
+                // 1. Create and shuffle dominoes
+                let deck = createDeck();
+                deck = shuffleDeck(deck);
+
+                // 2. Deal hands
+                game.players = [
+                    { id: 1, hand: dealHand(deck, 7), isBot: false, color: game.playerColors[0] },
+                    { id: 2, hand: dealHand(deck, 7), isBot: true, color: game.playerColors[1] },
+                    { id: 3, hand: dealHand(deck, 7), isBot: true, color: game.playerColors[2] },
+                    { id: 4, hand: dealHand(deck, 7), isBot: true, color: game.playerColors[3] }
+                ];
+                
+                // 3. Render hands (only P1 is visible)
+                renderPlayerHand();
+                renderOpponentHands();
+
+                // 4. Find starter
+                game.currentPlayerIndex = findStarter();
+                const starter = game.players[game.currentPlayerIndex];
+                
+                // 5. Update message
+                updateMessage(`Player ${starter.id}'s turn to start.`);
+                
+                // 6. Start countdown
+                startCountdown();
+                
+                // 7. Reset board
+                game.board = [];
+                game.ends = { left: null, right: null };
+                boardChain.innerHTML = '';
+            }
+
+            function createDeck() {
+                const deck = [];
+                for (let i = 0; i <= 6; i++) {
+                    for (let j = i; j <= 6; j++) {
+                        deck.push([i, j]);
+                    }
+                }
+                return deck;
+            }
+
+            function shuffleDeck(deck) {
+                for (let i = deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
+                }
+                return deck;
+            }
+
+            function dealHand(deck, size) {
+                return deck.splice(0, size);
+            }
+
+            function renderPlayerHand() {
+                playerHandEl.innerHTML = '';
+                const player = game.players[0]; // Always render human player
+                player.hand.forEach(tileValues => {
+                    playerHandEl.appendChild(createTileElement(tileValues));
+                });
+            }
+            
+            function renderOpponentHands() {
+                for(let i = 1; i < game.players.length; i++) {
+                    const handEl = document.getElementById(`opponent-hand-${i}`);
+                    handEl.innerHTML = '';
+                    for(let j = 0; j < game.players[i].hand.length; j++) {
+                        const tileBack = document.createElement('div');
+                        tileBack.className = 'tile-back';
+                        handEl.appendChild(tileBack);
+                    }
+                }
+            }
+
+            function createTileElement(values) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.dataset.values = JSON.stringify(values);
+                tile.innerHTML = `
+                    <div class="tile-half">${values[0]}</div>
+                    <div class="tile-divider"></div>
+                    <div class="tile-half">${values[1]}</div>
+                `;
+                return tile;
+            }
+
+            function findStarter() {
+                let highestDouble = -1;
+                let highestTile = -1;
+                let starterIndex = -1;
+                let highestTileValue = -1;
+
+                game.players.forEach((player, index) => {
+                    player.hand.forEach(tile => {
+                        if (tile[0] === tile[1] && tile[0] > highestDouble) {
+                            highestDouble = tile[0];
+                            starterIndex = index;
+                        }
+                        const tileSum = tile[0] + tile[1];
+                        if (tileSum > highestTileValue) {
+                            highestTileValue = tileSum;
+                            highestTile = index; // Fallback if no doubles
+                        }
+                    });
+                });
+
+                return (highestDouble !== -1) ? starterIndex : highestTile;
+            }
+            
+            function updateMessage(msg) {
+                messageEl.textContent = msg;
+            }
+
+            // --- 4. Countdown Sequence ---
+            function startCountdown() {
+                countdownOverlay.classList.add('show');
+                playSound(sounds.countdown, 0.5);
+
+                setTimeout(() => { countdownText.textContent = "3"; }, 0);
+                setTimeout(() => { countdownText.textContent = "2"; }, 1000);
+                setTimeout(() => { countdownText.textContent = "1"; }, 2000);
+                setTimeout(() => {
+                    countdownText.textContent = "GO!";
+                    playSound(sounds.go, 0.3);
+                }, 3000);
+                setTimeout(() => {
+                    countdownOverlay.classList.remove('show');
+                }, 3500);
+            }
+            
+            function playSound(sound, volume = 1.0) {
+                sound.currentTime = 0;
+                sound.volume = volume;
+                sound.play().catch(e => console.warn("Audio play failed:", e));
+            }
+
+            // --- 1. Sidebar Logic ---
+            function toggleSidebar() {
+                infoSidebar.classList.toggle('show');
+            }
+
+            // --- 2. Touch UX: Step 1 (Select) ---
+            function handleHandClick(e) {
+                const tileEl = e.target.closest('.tile');
+                if (!tileEl) return;
+                
+                // Check if it's player's turn
+                if (game.currentPlayerIndex !== 0) {
+                    showError(tileEl); // Flash red even if not turn
+                    return;
+                }
+                
+                playSound(sounds.select, 0.2);
+
+                // Deselect if clicking the same tile
+                if (game.selectedTile && game.selectedTile.element === tileEl) {
+                    clearSelection();
+                } else {
+                    // Clear previous selection
+                    clearSelection();
+                    
+                    // Set new selection
+                    tileEl.classList.add('selected-tile');
+                    tileEl.classList.add(`selected-${game.players[0].color}`);
+                    game.selectedTile = {
+                        element: tileEl,
+                        values: JSON.parse(tileEl.dataset.values),
+                        inHand: true
+                    };
+                }
+            }
+            
+            function clearSelection() {
+                if (game.selectedTile) {
+                    game.selectedTile.element.classList.remove('selected-tile');
+                    game.players.forEach(p => game.selectedTile.element.classList.remove(`selected-${p.color}`));
+                }
+                game.selectedTile = null;
+            }
+
+            // --- 2. Touch UX: Step 2 (Place) ---
+            function handleBoardClick(e) {
+                if (!game.selectedTile || game.currentPlayerIndex !== 0) {
+                    if(game.selectedTile) showError(game.selectedTile.element);
+                    return;
+                }
+
+                const isLeftClick = e.clientX < window.innerWidth / 2;
+                const tileValues = game.selectedTile.values;
+                let isValidMove = false;
+                let orientation = 0; // 0 for vertical, 90 for horizontal
+                let newValue; // The new "end" value
+
+                // --- 4. No Initial Auto-Play ---
+                if (game.board.length === 0) {
+                    // First move MUST be the starter tile (manually)
+                    // We just check if it's a double, simplification for this demo
+                    if (tileValues[0] === tileValues[1]) {
+                        isValidMove = true;
+                        game.ends.left = tileValues[0];
+                        game.ends.right = tileValues[1];
+                        orientation = 90; // Place doubles horizontally
+                    }
+                } else {
+                    // Subsequent moves
+                    const targetEnd = isLeftClick ? game.ends.left : game.ends.right;
+                    
+                    if (tileValues[0] === targetEnd) {
+                        isValidMove = true;
+                        newValue = tileValues[1];
+                    } else if (tileValues[1] === targetEnd) {
+                        isValidMove = true;
+                        newValue = tileValues[0];
+                        // We need to "flip" the tile visually
+                        tileValues.reverse(); // Mutate for rendering
+                    }
+                    
+                    if (isValidMove) {
+                        if (tileValues[0] === tileValues[1]) orientation = 90; // Doubles
+                        
+                        // Update the correct end
+                        if (isLeftClick) {
+                            game.ends.left = newValue;
+                        } else {
+                            game.ends.right = newValue;
+                        }
+                    }
+                }
+                
+                // --- 3. Error Feedback or Place Tile ---
+                if (!isValidMove) {
+                    showError(game.selectedTile.element);
+                } else {
+                    placeTileOnBoard(isLeftClick, orientation);
+                }
+            }
+            
+            function placeTileOnBoard(isLeft, orientation) {
+                playSound(sounds.place, 0.4);
+                
+                const tileEl = game.selectedTile.element;
+                
+                // 1. Remove from selection state
+                clearSelection();
+                
+                // 2. Remove from hand data
+                const player = game.players[game.currentPlayerIndex];
+                const tileIndex = player.hand.findIndex(t => 
+                    JSON.stringify(t) === tileEl.dataset.values
+                );
+                const [playedTileData] = player.hand.splice(tileIndex, 1);
+                
+                // 3. Add to board data
+                if (isLeft) {
+                    game.board.unshift(playedTileData);
+                } else {
+                    game.board.push(playedTileData);
+                }
+                
+                // 4. Update DOM
+                tileEl.classList.remove('selected-tile');
+                tileEl.style.transform = `rotate(${orientation}deg)`;
+                tileEl.style.margin = (orientation === 90) ? "0 -22px" : "0 2px"; // Handle overlap for doubles
+                
+                if (isLeft) {
+                    boardChain.prepend(tileEl);
+                } else {
+                    boardChain.appendChild(tileEl);
+                }
+                
+                // 5. Center the board (simple centering)
+                const boardRect = boardChain.getBoundingClientRect();
+                boardChain.style.left = `${(boardWrapper.clientWidth / 2) - (boardRect.width / 2)}px`;
+                boardChain.style.top = `${(boardWrapper.clientHeight / 2) - (boardRect.height / 2)}px`;
+
+                // 6. Move to next player
+                moveToNextPlayer();
+            }
+
+            // --- 3. Error Visual Feedback ---
+            function showError(tileElement) {
+                if (!tileElement) return;
+                
+                playSound(sounds.error, 0.3);
+                tileElement.classList.add('tile-error');
+                
+                setTimeout(() => {
+                    tileElement.classList.remove('tile-error');
+                }, 500);
+            }
+            
+            function moveToNextPlayer() {
+                // Check for win condition
+                if (game.players[game.currentPlayerIndex].hand.length === 0) {
+                    updateMessage(`Player ${game.players[game.currentPlayerIndex].id} Wins!`);
+                    setTimeout(initGame, 5000); // Restart after 5s
+                    return;
+                }
+                
+                game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
+                const nextPlayer = game.players[game.currentPlayerIndex];
+                
+                updateMessage(`Player ${nextPlayer.id}'s Turn`);
+
+                if (nextPlayer.isBot) {
+                    // Stub for bot logic
+                    setTimeout(runBotTurn, 1500);
+                }
+            }
+            
+            function runBotTurn() {
+                // This is a placeholder. A real bot would:
+                // 1. Check all tiles in its hand.
+                // 2. See if any can be played on game.ends.left or game.ends.right.
+                // 3. If yes, "play" it (update game state, render, call moveToNextPlayer).
+                // 4. If no, "pass" (update message, call moveToNextPlayer).
+                
+                // Simple "pass" logic for demo
+                const bot = game.players[game.currentPlayerIndex];
+                console.log(`Bot ${bot.id} is thinking...`);
+                updateMessage(`Player ${bot.id} passed.`);
+                
+                // Simulate opponent tile removal
+                renderOpponentHands(); 
+                
+                moveToNextPlayer();
+            }
+
+            // --- Start the game ---
+            initGame();
+        });
+    </script>
+</body>
+</html>
